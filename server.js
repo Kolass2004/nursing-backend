@@ -42,6 +42,13 @@ app.post('/config', (req, res) => {
 // Route to serve the config data
 app.get('/configdata', (req, res) => {
     const row = db.prepare('SELECT * FROM Config WHERE id = 1').get();
+    
+    // Parse JSON strings back into objects
+    if (row) {
+        row.postings = JSON.parse(row.postings);
+        row.allposting = JSON.parse(row.allposting);
+    }
+    
     res.setHeader('Content-Type', 'application/json');
     res.send(row);
 });
