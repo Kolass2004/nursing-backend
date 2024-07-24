@@ -1,5 +1,9 @@
 const Database = require('better-sqlite3');
-const db = new Database('database.sqlite');
+const path = require('path');
+
+// Define the path to the SQLite database file in the writable /tmp directory
+const dbPath = path.join('/tmp', 'database.sqlite');
+const db = new Database(dbPath);
 
 const createTable = `
 CREATE TABLE IF NOT EXISTS Config (
@@ -13,3 +17,4 @@ CREATE TABLE IF NOT EXISTS Config (
 db.exec(createTable);
 
 module.exports = db;
+
