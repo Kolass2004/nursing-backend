@@ -36,7 +36,10 @@ app.post('/config', (req, res) => {
         insertStmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
     }
 
-    res.send('Config updated successfully');
+    //res.send('Config updated successfully');
+    res.status(200).json({ message: 'Data processed successfully' });
+
+    
 });
 
 // Route to serve the config data
