@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const { Config, initializeDatabase, sequelize } = require('./database');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,12 +14,12 @@ app.use(cors());
 // Use body-parser to parse JSON request bodies
 app.use(bodyParser.json());
 
-// Define the paths to the JSON files
-const nameFilePath = path.join(__dirname, 'name.json');
-const configFilePath = path.join(__dirname, 'config.json');
+// Initialize the database
+initializeDatabase();
 
 // Route to serve the name.json data
 app.get('/data', (req, res) => {
+    const nameFilePath = path.join(__dirname, 'name.json');
     fs.readFile(nameFilePath, 'utf8', (err, data) => {
         if (err) {
             res.status(500).send('Error reading name.json file');
@@ -29,45 +30,36 @@ app.get('/data', (req, res) => {
     });
 });
 
-// Route to handle POST requests to update the config.json
-app.post('/config', (req, res) => {
+// Route to handle POST requests to update the config data
+app.post('/config', async (req, res) => {
     const newConfig = req.body;
 
-    // Read the existing config file
-    fs.readFile(configFilePath, 'utf8', (err, data) => {
-        if (err) {
-            return res.status(500).send('Error reading config.json file');
+    try {
+        let config = await Config.findOne({ where: { month: newConfig.month } });
+        if (config) {
+            // Update existing config
+            config.postings = newConfig.postings;
+            config.allposting = newConfig.allposting;
+            await config.save();
+        } else {
+            // Create new config
+            await Config.create(newConfig);
         }
-
-        let config;
-        try {
-            config = JSON.parse(data);
-        } catch (parseErr) {
-            return res.status(500).send('Error parsing config.json file');
-        }
-
-        // Update the config with new data
-        config = { ...config, ...newConfig };
-
-        // Write the updated config back to the file
-        fs.writeFile(configFilePath, JSON.stringify(config, null, 2), 'utf8', (writeErr) => {
-            if (writeErr) {
-                return res.status(500).send('Error writing config.json file');
-            }
-            res.send('Config updated successfully');
-        });
-    });
+        res.send('Config updated successfully');
+    } catch (error) {
+        res.status(500).send('Error updating config data');
+    }
 });
 
-// Route to serve the config.json data
-app.get('/configdata', (req, res) => {
-    fs.readFile(configFilePath, 'utf8', (err, data) => {
-        if (err) {
-            return res.status(500).send('Error reading config.json file');
-        }
+// Route to serve the config data
+app.get('/configdata', async (req, res) => {
+    try {
+        const configData = await Config.findAll();
         res.setHeader('Content-Type', 'application/json');
-        res.send(data);
-    });
+        res.send(configData);
+    } catch (error) {
+        res.status(500).send('Error reading config data');
+    }
 });
 
 // Start the server
