@@ -17,4 +17,3 @@ CREATE TABLE IF NOT EXISTS Config (
 db.exec(createTable);
 
 module.exports = db;
-

@@ -27,16 +27,23 @@ app.get('/data', (req, res) => {
 // Route to handle POST requests to update the config data
 app.post('/config', (req, res) => {
     const newConfig = req.body;
-    const stmt = db.prepare('INSERT INTO Config (month, postings, allposting) VALUES (?, ?, ?)');
-    stmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
+    const stmt = db.prepare('UPDATE Config SET month = ?, postings = ?, allposting = ? WHERE id = 1');
+    const info = stmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
+
+    if (info.changes === 0) {
+        // If no rows were updated, insert a new row (initial case)
+        const insertStmt = db.prepare('INSERT INTO Config (id, month, postings, allposting) VALUES (1, ?, ?, ?)');
+        insertStmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
+    }
+
     res.send('Config updated successfully');
 });
 
 // Route to serve the config data
 app.get('/configdata', (req, res) => {
-    const rows = db.prepare('SELECT * FROM Config').all();
+    const row = db.prepare('SELECT * FROM Config WHERE id = 1').get();
     res.setHeader('Content-Type', 'application/json');
-    res.send(rows);
+    res.send(row);
 });
 
 // Start the server
