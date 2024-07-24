@@ -3,15 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { Config, initializeDatabase, sequelize } = require('./database');
+const db = require('./database'); // Import the database module
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-
-initializeDatabase();
 
 // Route to serve the name.json data
 app.get('/data', (req, res) => {
@@ -27,33 +25,18 @@ app.get('/data', (req, res) => {
 });
 
 // Route to handle POST requests to update the config data
-app.post('/config', async (req, res) => {
+app.post('/config', (req, res) => {
     const newConfig = req.body;
-
-    try {
-        let config = await Config.findOne({ where: { month: newConfig.month } });
-        if (config) {
-            config.postings = newConfig.postings;
-            config.allposting = newConfig.allposting;
-            await config.save();
-        } else {
-            await Config.create(newConfig);
-        }
-        res.send('Config updated successfully');
-    } catch (error) {
-        res.status(500).send('Error updating config data');
-    }
+    const stmt = db.prepare('INSERT INTO Config (month, postings, allposting) VALUES (?, ?, ?)');
+    stmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
+    res.send('Config updated successfully');
 });
 
 // Route to serve the config data
-app.get('/configdata', async (req, res) => {
-    try {
-        const configData = await Config.findAll();
-        res.setHeader('Content-Type', 'application/json');
-        res.send(configData);
-    } catch (error) {
-        res.status(500).send('Error reading config data');
-    }
+app.get('/configdata', (req, res) => {
+    const rows = db.prepare('SELECT * FROM Config').all();
+    res.setHeader('Content-Type', 'application/json');
+    res.send(rows);
 });
 
 // Start the server

@@ -1,27 +1,15 @@
-// database.js
-const { Sequelize, DataTypes } = require('sequelize');
-const sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: './database.sqlite'
-});
+const Database = require('better-sqlite3');
+const db = new Database('database.sqlite');
 
-const Config = sequelize.define('Config', {
-    month: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    postings: {
-        type: DataTypes.JSON,
-        allowNull: false
-    },
-    allposting: {
-        type: DataTypes.JSON,
-        allowNull: false
-    }
-});
+const createTable = `
+CREATE TABLE IF NOT EXISTS Config (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  month TEXT,
+  postings TEXT,
+  allposting TEXT
+)
+`;
 
-const initializeDatabase = async () => {
-    await sequelize.sync();
-};
+db.exec(createTable);
 
-module.exports = { Config, initializeDatabase, sequelize };
+module.exports = db;
