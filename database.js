@@ -21,8 +21,7 @@ const Config = sequelize.define('Config', {
 });
 
 const initializeDatabase = async () => {
-    await sequelize.sync({ force: true }); // This will drop the table if it already exists
-    // Optional: Seed initial data from config.json here
+    await sequelize.sync();
 };
 
 module.exports = { Config, initializeDatabase, sequelize };

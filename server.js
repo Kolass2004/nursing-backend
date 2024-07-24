@@ -8,13 +8,9 @@ const { Config, initializeDatabase, sequelize } = require('./database');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS for all routes
 app.use(cors());
-
-// Use body-parser to parse JSON request bodies
 app.use(bodyParser.json());
 
-// Initialize the database
 initializeDatabase();
 
 // Route to serve the name.json data
@@ -37,12 +33,10 @@ app.post('/config', async (req, res) => {
     try {
         let config = await Config.findOne({ where: { month: newConfig.month } });
         if (config) {
-            // Update existing config
             config.postings = newConfig.postings;
             config.allposting = newConfig.allposting;
             await config.save();
         } else {
-            // Create new config
             await Config.create(newConfig);
         }
         res.send('Config updated successfully');
@@ -66,3 +60,5 @@ app.get('/configdata', async (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });
+
+module.exports = app;  // Export the app for vercel
