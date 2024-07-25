@@ -36,10 +36,7 @@ app.post('/config', (req, res) => {
         insertStmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
     }
 
-    //res.send('Config updated successfully');
-    res.status(200).json({ message: 'Data processed successfully' });
-
-    
+    res.send('Config updated successfully');
 });
 
 // Route to serve the config data
@@ -54,6 +51,57 @@ app.get('/configdata', (req, res) => {
     
     res.setHeader('Content-Type', 'application/json');
     res.send(row);
+});
+
+// Route to handle POST requests to submit student data
+app.post('/submit', (req, res) => {
+    const students = req.body.students;
+
+    // Use a transaction to handle multiple updates/insertions
+    const transaction = db.transaction(students => {
+        students.forEach(student => {
+            // Check if student already exists
+            const existingStudent = db.prepare('SELECT * FROM Students WHERE name = ?').get(student.name);
+            
+            if (existingStudent) {
+                // Update existing student
+                const stmt = db.prepare('UPDATE Students SET post1 = ?, post2 = ?, post3 = ?, post4 = ?, post5 = ?, post6 = ? WHERE name = ?');
+                stmt.run(student.post1, student.post2, student.post3, student.post4, student.post5, student.post6, student.name);
+            } else {
+                // Insert new student
+                const stmt = db.prepare('INSERT INTO Students (name, post1, post2, post3, post4, post5, post6) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                stmt.run(student.name, student.post1, student.post2, student.post3, student.post4, student.post5, student.post6);
+            }
+        });
+    });
+
+    try {
+        transaction(students);
+        res.send('Students data submitted successfully');
+    } catch (error) {
+        console.error('Error submitting students data:', error);
+        res.status(500).send('Error submitting students data');
+    }
+});
+
+// Route to handle GET requests to fetch submitted student data
+app.get('/submitData', (req, res) => {
+    const rows = db.prepare('SELECT * FROM Students').all();
+    
+    res.setHeader('Content-Type', 'application/json');
+    res.send({ students: rows });
+});
+
+// Route to clear all data from the Students and Config tables
+app.get('/clearData', (req, res) => {
+    try {
+        db.exec('DELETE FROM Students');
+        db.exec('DELETE FROM Config');
+        res.send('All data cleared successfully');
+    } catch (error) {
+        console.error('Error clearing data:', error);
+        res.status(500).send('Error clearing data');
+    }
 });
 
 // Start the server
