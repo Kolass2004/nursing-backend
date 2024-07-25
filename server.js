@@ -11,72 +11,86 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Helper function to handle database queries with promises
+const dbQuery = (query, params = []) => new Promise((resolve, reject) => {
+    try {
+        const stmt = db.prepare(query);
+        const result = stmt.run(...params);
+        resolve(result);
+    } catch (error) {
+        reject(error);
+    }
+});
+
+// Helper function to handle database transactions with promises
+const dbTransaction = (actions) => new Promise((resolve, reject) => {
+    const transaction = db.transaction(actions);
+    try {
+        resolve(transaction());
+    } catch (error) {
+        reject(error);
+    }
+});
+
 // Route to serve the name.json data
 app.get('/data', (req, res) => {
     const nameFilePath = path.join(__dirname, 'name.json');
     fs.readFile(nameFilePath, 'utf8', (err, data) => {
         if (err) {
-            res.status(500).send('Error reading name.json file');
-            return;
+            return res.status(500).json({ error: 'Error reading name.json file' });
         }
-        res.setHeader('Content-Type', 'application/json');
-        res.send(data);
+        res.json(JSON.parse(data));
     });
 });
 
 // Route to handle POST requests to update the config data
-app.post('/config', (req, res) => {
+app.post('/config', async (req, res) => {
     const newConfig = req.body;
-    const stmt = db.prepare('UPDATE Config SET month = ?, postings = ?, allposting = ? WHERE id = 1');
-    const info = stmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
-
-    if (info.changes === 0) {
-        // If no rows were updated, insert a new row (initial case)
-        const insertStmt = db.prepare('INSERT INTO Config (id, month, postings, allposting) VALUES (1, ?, ?, ?)');
-        insertStmt.run(newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting));
+    try {
+        const result = await dbQuery('UPDATE Config SET month = ?, postings = ?, allposting = ? WHERE id = 1', 
+            [newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting)]
+        );
+        if (result.changes === 0) {
+            await dbQuery('INSERT INTO Config (id, month, postings, allposting) VALUES (1, ?, ?, ?)', 
+                [newConfig.month, JSON.stringify(newConfig.postings), JSON.stringify(newConfig.allposting)]
+            );
+        }
+        res.send('Config updated successfully');
+    } catch (error) {
+        console.error('Error updating config:', error);
+        res.status(500).send('Error updating config');
     }
-
-    res.send('Config updated successfully');
 });
 
 // Route to serve the config data
 app.get('/configdata', (req, res) => {
     const row = db.prepare('SELECT * FROM Config WHERE id = 1').get();
-    
-    // Parse JSON strings back into objects
     if (row) {
         row.postings = JSON.parse(row.postings);
         row.allposting = JSON.parse(row.allposting);
+        res.json(row);
+    } else {
+        res.status(404).send('Config data not found');
     }
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.send(row);
 });
 
 // Route to handle POST requests to submit student data
-app.post('/submit', (req, res) => {
+app.post('/submit', async (req, res) => {
     const students = req.body.students;
 
-    // Use a transaction to handle multiple updates/insertions
-    const transaction = db.transaction(students => {
-        students.forEach(student => {
-            // Check if student already exists
-            const existingStudent = db.prepare('SELECT * FROM Students WHERE name = ?').get(student.name);
-            
-            if (existingStudent) {
-                // Update existing student
-                const stmt = db.prepare('UPDATE Students SET post1 = ?, post2 = ?, post3 = ?, post4 = ?, post5 = ?, post6 = ? WHERE name = ?');
-                stmt.run(student.post1, student.post2, student.post3, student.post4, student.post5, student.post6, student.name);
-            } else {
-                // Insert new student
-                const stmt = db.prepare('INSERT INTO Students (name, post1, post2, post3, post4, post5, post6) VALUES (?, ?, ?, ?, ?, ?, ?)');
-                stmt.run(student.name, student.post1, student.post2, student.post3, student.post4, student.post5, student.post6);
+    try {
+        await dbTransaction(() => {
+            for (const student of students) {
+                const existingStudent = db.prepare('SELECT * FROM Students WHERE name = ?').get(student.name);
+                if (existingStudent) {
+                    db.prepare('UPDATE Students SET post1 = ?, post2 = ?, post3 = ?, post4 = ?, post5 = ?, post6 = ? WHERE name = ?')
+                        .run(student.post1, student.post2, student.post3, student.post4, student.post5, student.post6, student.name);
+                } else {
+                    db.prepare('INSERT INTO Students (name, post1, post2, post3, post4, post5, post6) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                        .run(student.name, student.post1, student.post2, student.post3, student.post4, student.post5, student.post6);
+                }
             }
         });
-    });
-
-    try {
-        transaction(students);
         res.send('Students data submitted successfully');
     } catch (error) {
         console.error('Error submitting students data:', error);
@@ -87,9 +101,7 @@ app.post('/submit', (req, res) => {
 // Route to handle GET requests to fetch submitted student data
 app.get('/submitData', (req, res) => {
     const rows = db.prepare('SELECT * FROM Students').all();
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.send({ students: rows });
+    res.json({ students: rows });
 });
 
 // Route to clear all data from the Students and Config tables
